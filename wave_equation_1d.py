@@ -21,22 +21,28 @@ class WavePropagation:
         self.c_function = c_function
 
         self.border_width = 5
-        self.damping = 0.01
+        self.damping = 0.05
         
         self.x = np.arange(0, x_max, self.dx)
         
     def init_wave(self, u0): 
         self.u = u0
         self.u_v = np.zeros_like(u0)
+
+        # set the boundary to 0
+        self.u[:self.border_width] = 0
+        self.u[-self.border_width-1:] = 0
+        self.u_v[:self.border_width] = 0
+        self.u_v[-self.border_width-1:] = 0
     
     def add_wave(self, u0):
         self.u += u0
         
     def update(self):
-        #self.u[0:self.border_width] = self.u[self.border_width+1] * 0.99
-        #self.u[-self.border_width-1:-1] = self.u[-self.border_width-1] * 0.99
-        #self.u_v[0:self.border_width] = self.u_v[self.border_width+1] * 0.99
-        #self.u_v[-self.border_width-1:-1] = self.u_v[-self.border_width-1] * 0.99
+        #self.u[:self.border_width] = self.u[self.border_width+1] * 0.9
+        #self.u[-self.border_width-1:] = self.u[-self.border_width] * 0.9
+        #self.u_v[:self.border_width] = self.u_v[self.border_width+1] * 0.9
+        #self.u_v[-self.border_width-1:] = self.u_v[-self.border_width] * 0.9
 
         # set the boundary to 0
         self.u[:self.border_width] = 0
@@ -77,14 +83,19 @@ class WavePropagation:
             wave_v += c ** 2 * laplacian * self.dt
             wave += wave_v * self.dt
 
+            # damping
+            wavelength_factor = 1 / 2 / np.pi * np.abs(k)
+            wave *= 1 - self.damping * wavelength_factor * self.dt
+
             # add the wave back
             new_u += (wave * self.dx / 2).real
             new_u_v += (wave_v * self.dx / 2).real
 
+        # the copying that I forgot, avoids annoying linking behaviours
         self.u = new_u.copy()
         self.u_v = new_u_v.copy()
 
-        self.u *= 1 - self.damping * self.dt
+        #self.u *= 1 - self.damping * self.dt
 
         self.t += self.dt
         self.frame_count += 1
@@ -96,12 +107,13 @@ class WavePropagation:
 
 t_max = 10
 x_max = 2
-dt = 0.01
+dt = 0.02
 dx = 0.01
 
-x = np.arange(0, x_max, dx) #+ x_max / 3
-wave_freq = 1000
-u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * 0.08
+x = np.arange(0.5, x_max+0.5, dx) #+ x_max / 3
+wave_freq = 200
+u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * 0.2
+u0 = np.interp(x, [0, x_max], [-0.1, 0.2])
 
 def wave_speed(wavelength):
     speed = np.sqrt((9.8 * wavelength / 2 / np.pi + 2 * np.pi * 0.0728 / 1000 / wavelength) * np.tanh(2 * np.pi * 10 / wavelength)) * 1
@@ -118,25 +130,25 @@ fig, ax = plt.subplots()
 fig.set_size_inches(11, 7)
 
 def init_animate():
-    sim.line = ax.plot(sim.x, sim.u)[0]
+    sim.line = ax.plot(sim.x[sim.border_width:-sim.border_width-1], sim.u[sim.border_width:-sim.border_width-1])[0]
     
 def update_animate(data):
-    if sim.frame_count % 100 == 50:
+    if sim.frame_count % 100 == 50 and sim.frame_count < 300:
         offset = np.random.uniform(-x_max/3, x_max/3)
         x = np.arange(offset, x_max + offset, dx)
 
         freq_factor = np.random.rand()
         wave_freq = np.interp(freq_factor, [0, 1], [500, 10000])
-        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * np.interp(freq_factor, [0, 1], [0.05, 0.02]) * 10
+        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * np.interp(freq_factor, [0, 1], [0.05, 0.02]) * 5
         #sim.add_wave(u0)
     
     sim.update() # 更新波形
-    sim.line.set_data(sim.x, sim.u)
+    sim.line.set_data(sim.x[sim.border_width:-sim.border_width-1], sim.u[sim.border_width:-sim.border_width-1])
     return sim.line,
 
 # 啟動動畫
 ani = animation.FuncAnimation(fig, update_animate, 
-                              init_func=init_animate, interval=10) 
+                              init_func=init_animate, interval=1) 
 
 plt.ylim([-1, 1])
 
