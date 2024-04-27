@@ -10,15 +10,15 @@ derivative_kernel = [-1/12, 4/3, -5/2, 4/3, -1/12]
 
 class WavePropagation:
     def __init__(
-            self, t_max, x_max, dt=0.01, dx=1,
-            c: typing.Callable = None):
+            self, t_max, x_max, dt=0.01, dx=1.,
+            c_function: typing.Callable = None):
         self.t = 0
         self.frame_count = 0
         self.t_max = t_max
         self.x_max = x_max
         self.dt = dt
         self.dx = dx
-        self.c_function = c
+        self.c_function = c_function
 
         self.border_width = 5
         self.damping = 0.01
@@ -33,18 +33,56 @@ class WavePropagation:
         self.u += u0
         
     def update(self):
-        self.u[0:self.border_width] = self.u[self.border_width+1] * 0.99
-        self.u[-self.border_width-1:-1] = self.u[-self.border_width-1] * 0.99
-        self.u_v[0:self.border_width] = self.u_v[self.border_width+1] * 0.99
-        self.u_v[-self.border_width-1:-1] = self.u_v[-self.border_width-1] * 0.99
+        #self.u[0:self.border_width] = self.u[self.border_width+1] * 0.99
+        #self.u[-self.border_width-1:-1] = self.u[-self.border_width-1] * 0.99
+        #self.u_v[0:self.border_width] = self.u_v[self.border_width+1] * 0.99
+        #self.u_v[-self.border_width-1:-1] = self.u_v[-self.border_width-1] * 0.99
 
-        c = self.c_function(2 * np.pi) / 10
+        # set the boundary to 0
+        self.u[:self.border_width] = 0
+        self.u[-self.border_width-1:] = 0
+        self.u_v[:self.border_width] = 0
+        self.u_v[-self.border_width-1:] = 0
 
-        # calculate the second derivative of u with 4th order accuracy
-        laplacian = np.convolve(self.u, derivative_kernel, 'same') / self.dx ** 2
+        u_freq = fft(self.u)
+        u_v_freq = fft(self.u_v)
 
-        self.u_v += c ** 2 * laplacian * self.dt
-        self.u += self.u_v * self.dt
+        new_u = np.zeros_like(self.u)
+        new_u_v = np.zeros_like(self.u_v)
+
+        for n in range(len(u_freq)):
+            # get the wave number of current wave
+            k = 2 * np.pi * np.fft.fftfreq(len(self.u), d=self.dx)[n]
+            if k == 0:
+                k = 0.1
+
+            # get the wave speed of current wave
+            c = self.c_function(2 * np.pi / np.abs(k))
+
+            # reconstruct the decomposed wave
+            wave = np.real(np.exp(1j * k * self.x) * u_freq[n])
+            wave_v = np.real(np.exp(1j * k * self.x) * u_v_freq[n])
+            #pulse_freq = np.zeros_like(u_freq)
+            #pulse_freq[n] = u_freq[n]
+            #wave = ifft(pulse_freq)
+
+            #pulse_freq = np.zeros_like(u_v_freq)
+            #pulse_freq[n] = u_v_freq[n]
+            #wave_v = ifft(pulse_freq)
+
+            # calculate the second derivative of the wave with 4th order accuracy
+            laplacian = np.convolve(wave, derivative_kernel, 'same') / self.dx ** 2
+
+            # update the wave
+            wave_v += c ** 2 * laplacian * self.dt
+            wave += wave_v * self.dt
+
+            # add the wave back
+            new_u += (wave * self.dx / 2).real
+            new_u_v += (wave_v * self.dx / 2).real
+
+        self.u = new_u.copy()
+        self.u_v = new_u_v.copy()
 
         self.u *= 1 - self.damping * self.dt
 
@@ -62,7 +100,7 @@ dt = 0.01
 dx = 0.01
 
 x = np.arange(0, x_max, dx) #+ x_max / 3
-wave_freq = 500
+wave_freq = 1000
 u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * 0.08
 
 def wave_speed(wavelength):
@@ -90,7 +128,7 @@ def update_animate(data):
         freq_factor = np.random.rand()
         wave_freq = np.interp(freq_factor, [0, 1], [500, 10000])
         u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * np.interp(freq_factor, [0, 1], [0.05, 0.02]) * 10
-        sim.add_wave(u0)
+        #sim.add_wave(u0)
     
     sim.update() # 更新波形
     sim.line.set_data(sim.x, sim.u)
