@@ -4,9 +4,52 @@ from numpy import typing as np_types
 from scipy.fft import fft, ifft, fft2, ifft2
 import matplotlib.animation as animation
 import typing
+from numba import jit
+import numba as nb
 
 #c_func_type = typing.Union[typing.Callable[[np_types.ArrayLike[float]], np_types.ArrayLike[float]], None]
 derivative_kernel = [-1/12, 4/3, -5/2, 4/3, -1/12]
+
+def wave_equation_step(u, u_v, x, dx, dt, c_function, damping):
+    u_freq = np.fft.fft(u)
+    u_v_freq = np.fft.fft(u_v)
+
+    return main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq)
+
+#@jit
+def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq):
+    new_u = np.zeros_like(u)
+    new_u_v = np.zeros_like(u_v)
+
+    for n in range(len(u_freq)):
+        # get the wave number of current wave
+        k = 2 * np.pi * np.fft.fftfreq(len(u), d=dx)[n]
+        if k == 0:
+            k = 0.1
+
+        # get the wave speed of current wave
+        c = c_function(2 * np.pi / np.abs(k))
+
+        # reconstruct the decomposed wave
+        wave = np.real(np.exp(1j * k * x) * u_freq[n])
+        wave_v = np.real(np.exp(1j * k * x) * u_v_freq[n])
+
+        # calculate the second derivative of the wave with 4th order accuracy
+        laplacian = np.convolve(wave, derivative_kernel, 'same') / dx ** 2
+
+        # update the wave
+        wave_v += c ** 2 * laplacian * dt
+        wave += wave_v * dt
+
+        # damping
+        wavelength_factor = 1 / 2 / np.pi * np.abs(k)
+        wave *= 1 - damping * wavelength_factor * dt
+
+        # add the wave back
+        new_u += wave * dx / 2
+        new_u_v += wave_v * dx / 2
+
+    return new_u.copy(), new_u_v.copy()
 
 class WavePropagation:
     def __init__(
@@ -56,52 +99,7 @@ class WavePropagation:
         #self.u_v[:self.border_width] = 0
         #self.u_v[-self.border_width-1:] = 0
 
-        u_freq = fft(self.u)
-        u_v_freq = fft(self.u_v)
-
-        new_u = np.zeros_like(self.u)
-        new_u_v = np.zeros_like(self.u_v)
-
-        for n in range(len(u_freq)):
-            # get the wave number of current wave
-            k = 2 * np.pi * np.fft.fftfreq(len(self.u), d=self.dx)[n]
-            if k == 0:
-                k = 0.1
-
-            # get the wave speed of current wave
-            c = self.c_function(2 * np.pi / np.abs(k))
-
-            # reconstruct the decomposed wave
-            wave = np.real(np.exp(1j * k * self.x) * u_freq[n])
-            wave_v = np.real(np.exp(1j * k * self.x) * u_v_freq[n])
-            #pulse_freq = np.zeros_like(u_freq)
-            #pulse_freq[n] = u_freq[n]
-            #wave = ifft(pulse_freq)
-
-            #pulse_freq = np.zeros_like(u_v_freq)
-            #pulse_freq[n] = u_v_freq[n]
-            #wave_v = ifft(pulse_freq)
-
-            # calculate the second derivative of the wave with 4th order accuracy
-            laplacian = np.convolve(wave, derivative_kernel, 'same') / self.dx ** 2
-
-            # update the wave
-            wave_v += c ** 2 * laplacian * self.dt
-            wave += wave_v * self.dt
-
-            # damping
-            wavelength_factor = 1 / 2 / np.pi * np.abs(k)
-            wave *= 1 - self.damping * wavelength_factor * self.dt
-
-            # add the wave back
-            new_u += (wave * self.dx / 2).real
-            new_u_v += (wave_v * self.dx / 2).real
-
-        # the copying that I forgot, avoids annoying linking behaviours
-        self.u = new_u.copy()
-        self.u_v = new_u_v.copy()
-
-        #self.u *= 1 - self.damping * self.dt
+        self.u, self.u_v = wave_equation_step(self.u, self.u_v, self.x, self.dx, self.dt, self.c_function, self.damping)
 
         self.t += self.dt
         self.frame_count += 1
@@ -122,13 +120,11 @@ wave_freq = 200
 #u0 = np.interp(x, [0, x_max], [-0.1, 0.1])
 u0 = np.zeros_like(x)
 
+@jit
 def wave_speed(wavelength):
     speed = np.sqrt((9.8 * wavelength / 2 / np.pi + 2 * np.pi * 0.0728 / 1000 / wavelength) * np.tanh(2 * np.pi * 10 / wavelength)) * 1
-    #speed = wavelength * 0 + 1
-    try:
-        speed[speed == np.nan] = 0
-    except TypeError:
-        pass
+    if speed == np.nan:
+        speed = 0
     return speed
 
 sim = WavePropagation(t_max, x_max, dt, dx, wave_speed)
