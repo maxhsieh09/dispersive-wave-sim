@@ -12,7 +12,7 @@ class WavePropagation:
     def __init__(
             self, t_max, x_max, dt=0.01, dx=1.,
             c_function: typing.Callable = None):
-        self.t = 0
+        self.t = 0.
         self.frame_count = 0
         self.t_max = t_max
         self.x_max = x_max
@@ -145,13 +145,13 @@ def init_animate():
     )
     
 def update_animate(data):
-    if sim.frame_count % 100 == 50:
+    if sim.frame_count % 100 == 50 and sim.frame_count < 500:
         offset = np.random.uniform(-x_max/3, x_max/3)
         x = np.arange(offset, x_max + offset, dx)
 
-        freq_factor = np.random.rand()
+        freq_factor = np.random.rand() ** 2
         wave_freq = np.interp(freq_factor, [0, 1], [500, 10000])
-        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) / wave_freq * 200# * np.interp(freq_factor, [0, 1], [0.05, 0.02])
+        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) / wave_freq * 120 # * np.interp(freq_factor, [0, 1], [0.05, 0.02])
         sim.add_wave(u0)
     
     sim.update() # 更新波形
@@ -162,6 +162,8 @@ def update_animate(data):
         -1,
         color="skyblue"
     )
+    ax.set_title(f"t = {sim.t:.2f}")
+
     return sim.line,
 
 # 啟動動畫
