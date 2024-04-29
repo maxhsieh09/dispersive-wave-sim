@@ -36,6 +36,7 @@ def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq):
 
         # calculate the second derivative of the wave with 4th order accuracy
         laplacian = np.convolve(wave, derivative_kernel, 'same') / dx ** 2
+        #laplacian = np.real(np.exp(1j * k * x) * u_freq[n] * -k**2)
 
         # update the wave
         wave_v += c ** 2 * laplacian * dt
