@@ -6,14 +6,13 @@ import scipy
 import matplotlib.animation as animation
 from matplotlib.colors import LightSource
 import typing
-from numba import jit
+import numba
 
-#c_func_type = typing.Union[typing.Callable[[np_types.ArrayLike[float]], np_types.ArrayLike[float]], None]
 derivative_kernel = [[0.25, 0.5, 0.25],
                      [0.5, -3.0, 0.5],
                      [0.25, 0.5, 0.25]]
 
-@jit
+@numba.jit
 def wave_equation_step(u_freq, u_v_freq, k_table, u, u_v, c_function, damping, xx, yy, dt):
     new_u = np.zeros_like(u)
     new_u_v = np.zeros_like(u_v)
@@ -26,7 +25,7 @@ def wave_equation_step(u_freq, u_v_freq, k_table, u, u_v, c_function, damping, x
             k = np.sqrt(k_x**2 + k_y**2)
             
             if k == 0:
-                k = 0.1
+                k = 0.01
 
             # get the wave speed of current wave
             c = c_function(2 * np.pi / np.abs(k))
@@ -35,10 +34,6 @@ def wave_equation_step(u_freq, u_v_freq, k_table, u, u_v, c_function, damping, x
             wave = np.real(np.exp(1j * (k_x * xx + k_y * yy)) * u_freq[n, m])
             wave_v = np.real(np.exp(1j * (k_x * xx + k_y * yy))
                                 * (u_v_freq[n, m] + c ** 2 * u_freq[n, m] * -k**2 * dt))
-
-            # calculate the second derivative of the wave with 4th order accuracy
-            #laplacian = scipy.signal.convolve2d(wave, derivative_kernel, 'same') / dx ** 2
-            #laplacian = np.real(np.exp(1j * (k_x * xx + k_y * yy)) * u_freq[n, m] * -k**2)
 
             # update the wave
             #wave_v += c ** 2 * laplacian * dt
@@ -144,10 +139,10 @@ u0 = np.exp(-wave_freq * ((xx - x_max / 3) ** 2 + (yy - x_max / 3) ** 2)) * 0.2
 #u0 = np.interp(x, [0, x_max], [-0.1, 0.1])
 #u0 = np.zeros_like(xx)
 
-@jit
+@numba.jit
 def wave_speed(wavelength):
     speed = np.sqrt((9.8 * wavelength / 2 / np.pi + 2 * np.pi * 0.0728 / 1000 / wavelength) * np.tanh(2 * np.pi * 10 / wavelength)) * 1
-    #speed = wavelength * 0 + 1
+    
     if speed == 0:
         speed = 0.1
     return speed
