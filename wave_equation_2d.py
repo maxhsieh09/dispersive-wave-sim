@@ -4,7 +4,6 @@ from numpy import typing as np_types
 from scipy.fft import fft, ifft, fft2, ifft2
 import scipy
 import matplotlib.animation as animation
-from matplotlib.colors import LightSource
 import typing
 import numba
 

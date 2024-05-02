@@ -13,17 +13,19 @@ derivative_kernel = [-1/12, 4/3, -5/2, 4/3, -1/12]
 def wave_equation_step(u, u_v, x, dx, dt, c_function, damping):
     u_freq = np.fft.fft(u)
     u_v_freq = np.fft.fft(u_v)
+    k_table = 2 * np.pi * np.fft.fftfreq(len(u), d=dx)
 
-    return main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq)
+    return main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq, k_table)
 
 #@jit
-def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq):
+def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq, k_table):
     new_u = np.zeros_like(u)
     new_u_v = np.zeros_like(u_v)
 
     for n in range(len(u_freq)):
         # get the wave number of current wave
-        k = 2 * np.pi * np.fft.fftfreq(len(u), d=dx)[n]
+        #k = 2 * np.pi * np.fft.fftfreq(len(u), d=dx)[n]
+        k = k_table[n]
         if k == 0:
             k = 0.1
 
@@ -33,6 +35,8 @@ def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq):
         # reconstruct the decomposed wave
         wave = np.real(np.exp(1j * k * x) * u_freq[n])
         wave_v = np.real(np.exp(1j * k * x) * u_v_freq[n])
+        #wave_v = np.real(np.exp(1j * k * x)
+        #                 * (u_v_freq[n] + c ** 2 * u_freq[n] * -k**2 * dt))
 
         # calculate the second derivative of the wave with 4th order accuracy
         laplacian = np.convolve(wave, derivative_kernel, 'same') / dx ** 2
@@ -45,6 +49,7 @@ def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq):
         # damping
         wavelength_factor = 1 / 2 / np.pi * np.abs(k)
         wave *= 1 - damping * wavelength_factor * dt
+        #wave_v *= 1 - damping * wavelength_factor * dt
 
         # add the wave back
         new_u += wave * dx / 2
@@ -159,7 +164,7 @@ def update_animate(data):
         -1,
         color="skyblue"
     )
-    ax.set_title(f"t = {sim.t:.2f}")
+    ax.set_title(f"t = {sim.t:.2f}, {sim.frame_count} steps")
 
     return sim.line,
 
