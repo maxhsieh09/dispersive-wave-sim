@@ -52,8 +52,8 @@ def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq, k_table)
         #wave_v *= 1 - damping * wavelength_factor * dt
 
         # add the wave back
-        new_u += wave * dx / 2
-        new_u_v += wave_v * dx / 2
+        new_u += wave / len(u_freq)
+        new_u_v += wave_v / len(u_v_freq)
 
     return new_u.copy(), new_u_v.copy()
 
@@ -116,9 +116,9 @@ class WavePropagation:
 
 
 t_max = 10
-x_max = 2
-dt = 0.03
-dx = 0.01
+x_max = 0.1
+dt = 0.001
+dx = 0.002
 
 x = np.arange(0.5, x_max+0.5, dx) #+ x_max / 3
 wave_freq = 200
@@ -131,6 +131,7 @@ def wave_speed(wavelength):
     speed = np.sqrt((9.8 * wavelength / 2 / np.pi + 2 * np.pi * 0.0728 / 1000 / wavelength) * np.tanh(2 * np.pi * 10 / wavelength)) * 1
     if speed == np.nan:
         speed = 0
+        
     return speed
 
 sim = WavePropagation(t_max, x_max, dt, dx, wave_speed)
@@ -147,13 +148,13 @@ def init_animate():
     )
     
 def update_animate(data):
-    if sim.frame_count % 100 == 50 and sim.frame_count < 500:
+    if sim.frame_count % 500 == 50:# and sim.frame_count < 500:
         offset = np.random.uniform(-x_max/3, x_max/3)
         x = np.arange(offset, x_max + offset, dx)
 
         freq_factor = np.random.rand() ** 2
         wave_freq = np.interp(freq_factor, [0, 1], [500, 10000])
-        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) / wave_freq * 120 # * np.interp(freq_factor, [0, 1], [0.05, 0.02])
+        u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) / wave_freq * 120
         sim.add_wave(u0)
     
     sim.update() # 更新波形
