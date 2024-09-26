@@ -48,7 +48,7 @@ def main_loop(u, u_v, x, dx, dt, c_function, damping, u_freq, u_v_freq, k_table)
 
         # damping
         wavelength_factor = 1 / 2 / np.pi * np.abs(k)
-        wave *= 1 - damping * wavelength_factor * dt
+        wave *= np.clip(1 - damping * wavelength_factor * dt, 0.1, 1)
         #wave_v *= 1 - damping * wavelength_factor * dt
 
         # add the wave back
@@ -116,15 +116,15 @@ class WavePropagation:
 
 
 t_max = 10
-x_max = 0.1
-dt = 0.001
-dx = 0.002
+x_max = 0.5
+dt = 0.03
+dx = 0.01
 
 x = np.arange(0.5, x_max+0.5, dx) #+ x_max / 3
 wave_freq = 200
-#u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * 0.1
+u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) * 0.1
 #u0 = np.interp(x, [0, x_max], [-0.1, 0.1])
-u0 = np.zeros_like(x)
+#u0 = np.zeros_like(x)
 
 @jit
 def wave_speed(wavelength):
@@ -148,12 +148,12 @@ def init_animate():
     )
     
 def update_animate(data):
-    if sim.frame_count % 500 == 50:# and sim.frame_count < 500:
+    if sim.frame_count % 100 == 50:# and sim.frame_count < 500:
         offset = np.random.uniform(-x_max/3, x_max/3)
         x = np.arange(offset, x_max + offset, dx)
 
         freq_factor = np.random.rand() ** 2
-        wave_freq = np.interp(freq_factor, [0, 1], [500, 10000])
+        wave_freq = np.interp(freq_factor, [0, 1], [500, 10000]) / x_max
         u0 = np.exp(-wave_freq * (x - x_max / 2) ** 2) / wave_freq * 120
         sim.add_wave(u0)
     
