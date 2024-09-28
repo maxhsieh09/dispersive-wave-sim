@@ -14,8 +14,35 @@ dt = 0.003
 dx = 0.002
 
 
+def height_to_normal_map(height_map, spacing=1.0):
+    """
+    Convert a height map into a normal map.
+
+    Parameters:
+    - height_map: 2D numpy array of height values.
+    - spacing: Real-world distance between each point in the height map.
+    
+    Returns:
+    - normal_map: 3D numpy array where each pixel contains the normal vector [nx, ny, nz].
+    """
+    # Get gradients in x and y direction (central difference)
+    dx, dy = np.gradient(height_map, spacing)
+
+    # The z component of the normal is always 1 since we're assuming the normal is based on a height map.
+    dz = np.ones_like(height_map)
+
+    # Stack the gradients to form the normal vectors [nx, ny, nz]
+    normals = np.stack((-dx, -dy, dz), axis=-1)
+
+    # Normalize the normal vectors
+    norm = np.linalg.norm(normals, axis=2, keepdims=True)
+    normal_map = normals / (norm + 1e-8)  # Prevent division by zero
+
+    return normal_map
+
+
 class HeightField2D:
-    def __init__(self, t_max, x_max, dt, dx, density=1000):
+    def __init__(self, t_max: float, x_max: float, dt: float, dx: float, density=1000.):
         self.t = 0
         self.frame_count = 0
 
@@ -52,10 +79,22 @@ class HeightField2D:
         self.t += self.dt
         self.frame_count += 1
 
-    def to_surface(self, min=-1.0, max=1.0):
-        image = np.interp(self.surface_height, [min, max], [0, 255])
-        image = np.clip(image, 0, 255).astype(np.uint8)
-        image = cv2.resize(cv2.cvtColor(image, cv2.COLOR_GRAY2RGB), window_size, interpolation=cv2.INTER_CUBIC)
+    def to_surface(self, min=-1.0, max=1.0, shaded=False):
+        if shaded:
+            scaled_height = cv2.resize(self.surface_height, window_size, interpolation=cv2.INTER_CUBIC)
+            normal = height_to_normal_map(scaled_height, self.dx)
+
+            light_dir = np.array([-1.0, -1.0, 1.0])
+            light_dir = light_dir / np.linalg.norm(light_dir)
+
+            image = np.einsum('ijk,k->ij', normal, light_dir)
+            image = np.clip(image, 0, 1)
+            image = (image * 255).astype(np.uint8)
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        else:
+            image = np.interp(self.surface_height, [min, max], [0, 255])
+            image = np.clip(image, 0, 255).astype(np.uint8)
+            image = cv2.resize(cv2.cvtColor(image, cv2.COLOR_GRAY2RGB), window_size, interpolation=cv2.INTER_CUBIC)
 
         return pygame.surfarray.make_surface(image)
     
@@ -127,7 +166,7 @@ def gaussian_wave(sim, x, y, std):
 
 sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 3
+sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1
 
 pygame.init()
 screen = pygame.display.set_mode(window_size)
@@ -141,17 +180,17 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             x = (0.5 - event.pos[0] / window_size[0]) * x_max
             y = (0.5 - event.pos[1] / window_size[1]) * x_max
-            sim.fluid_height += gaussian_wave(sim, y, x, 0.01)
+            sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
-                sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.1
+                sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(), (0, 0))
+    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=True), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
