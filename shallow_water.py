@@ -13,6 +13,8 @@ x_max = 0.5
 dt = 0.003
 dx = 0.002
 
+base_color = np.array([167, 207, 250]) / 255
+
 
 def height_to_normal_map(height_map, spacing=1.0):
     """
@@ -41,6 +43,15 @@ def height_to_normal_map(height_map, spacing=1.0):
     return normal_map
 
 
+def fresnel(angle, n2):
+    r0 = ((1 - n2) / (1 + n2)) ** 2
+    return r0 + (1 - r0) * (1 - np.cos(angle)) ** 5
+
+
+def linear_to_gamma(color):
+    return color ** (1 / 2.2)
+
+
 class HeightField2D:
     def __init__(self, t_max: float, x_max: float, dt: float, dx: float, density=1000.):
         self.t = 0
@@ -50,12 +61,12 @@ class HeightField2D:
         self.x_max = x_max
         self.dt = dt
         self.dx = dx
-        self.size = int(x_max / dx), int(x_max / dx)
         self.density = density
         self.border_width = 10
 
         x_coords = np.arange(0, x_max, self.dx)
         y_coords = np.arange(0, x_max, self.dx)
+        self.size = len(x_coords), len(y_coords)
         self.x_coords, self.y_coords = np.meshgrid(x_coords, y_coords)
 
         self.fluid_height = np.zeros(self.size)
@@ -88,9 +99,16 @@ class HeightField2D:
             light_dir = light_dir / np.linalg.norm(light_dir)
 
             image = np.einsum('ijk,k->ij', normal, light_dir)
+            #view_angle = np.arccos(normal[:, :, 2])
+            #image = fresnel(view_angle, 1.33)
+
+            image = np.repeat(image[:, :, np.newaxis], 3, axis=2)
+            image *= base_color
+            image = linear_to_gamma(image)
             image = np.clip(image, 0, 1)
             image = (image * 255).astype(np.uint8)
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+            #image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+            
         else:
             image = np.interp(self.surface_height, [min, max], [0, 255])
             image = np.clip(image, 0, 255).astype(np.uint8)
@@ -190,7 +208,7 @@ while running:
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=True), (0, 0))
+    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=False), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
