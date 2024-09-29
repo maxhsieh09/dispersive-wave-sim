@@ -10,8 +10,8 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.std
 window_size = (600, 600)
 t_max = 10
 x_max = 0.5
-dt = 0.003
-dx = 0.002
+dt = 0.0003
+dx = 0.001
 
 base_color = np.array([167, 207, 250]) / 255
 
@@ -130,20 +130,55 @@ class ShallowWater(HeightField2D):
     @property
     def surface_height(self):
         return self.fluid_height + self.bed_height
+    
+    def clamp(self, field):
+        return np.clip(np.nan_to_num(field, posinf=0, neginf=0), -100000, 100000)
 
     def update(self):
+        # Calculate the change rate of fluid height
         x_gradient = np.gradient(self.fluid_height * self.u, self.dx)[0]
         y_gradient = np.gradient(self.fluid_height * self.v, self.dx)[1]
-        self.fluid_height += -(x_gradient + y_gradient) * self.dt
+        d_eta = (x_gradient + y_gradient)
+        self.fluid_height += d_eta * self.dt
 
+        # Calculate the change rate of u
         gravity_gradient = self.gradient(
             self.density * self.fluid_height * self.u ** 2 +
-            self.density * -9.8 * self.fluid_height ** 2,
+            0.5 * self.density * -9.8 * self.fluid_height ** 2
         )[0]
 
         uv_gradient = self.gradient(
             self.density * self.fluid_height * self.u * self.v,
         )[1]
+
+        gravity_gradient = self.clamp(gravity_gradient)
+        uv_gradient = self.clamp(uv_gradient)
+
+        d_eta_u = -(gravity_gradient + uv_gradient) / self.density
+        d_u = (d_eta_u - d_eta * self.u) / self.fluid_height
+        self.u += d_u * self.dt
+
+        # Calculate the change rate of v
+        gravity_gradient = self.gradient(
+            self.density * self.fluid_height * self.v ** 2 +
+            0.5 * self.density * -9.8 * self.fluid_height ** 2
+        )[1]
+
+        uv_gradient = self.gradient(
+            self.density * self.fluid_height * self.u * self.v,
+        )[0]
+
+        gravity_gradient = self.clamp(gravity_gradient)
+        uv_gradient = self.clamp(uv_gradient)
+
+        d_eta_v = -(gravity_gradient + uv_gradient) / self.density
+        d_v = (d_eta_v - d_eta * self.v) / self.fluid_height
+        self.v += d_v * self.dt
+
+        # clamp overflow
+        self.u = self.clamp(self.u)
+        self.v = self.clamp(self.v)
+        self.fluid_height = self.clamp(self.fluid_height)
 
         super().update()
 
@@ -182,9 +217,9 @@ def gaussian_wave(sim, x, y, std):
     return u0
 
 
-sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
+sim = ShallowWater(t_max, x_max, dt, dx)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1
+sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1 + 0.2
 
 pygame.init()
 screen = pygame.display.set_mode(window_size)
@@ -208,7 +243,7 @@ while running:
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=False), (0, 0))
+    screen.blit(sim.to_surface(min=0.1, max=0.3, shaded=False), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
