@@ -219,7 +219,10 @@ def gaussian_wave(sim, x, y, std):
 
 sim = ShallowWater(t_max, x_max, dt, dx)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1 + 0.2
+sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1 + 0.1
+#sim.bed_height = sim.x_coords / 3
+#sim.fluid_height -= sim.bed_height
+#sim.fluid_height = np.clip(sim.fluid_height, 0, None)
 
 pygame.init()
 screen = pygame.display.set_mode(window_size)
@@ -243,7 +246,7 @@ while running:
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(min=0.1, max=0.3, shaded=False), (0, 0))
+    screen.blit(sim.to_surface(min=0.1, max=0.4, shaded=False), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
