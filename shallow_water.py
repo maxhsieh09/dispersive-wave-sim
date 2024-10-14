@@ -213,6 +213,43 @@ class WaveEquation(HeightField2D):
         super().update()
 
 
+class NormalModes(HeightField2D):
+    def __init__(self, t_max, x_max, dt, dx, wave_speed):
+        super().__init__(t_max, x_max, dt, dx)
+
+        self.mode_weights = np.zeros(self.size) # Complex numbers that represent the phases
+
+        self.mode_wavelengths = np.zeros(self.size)
+        for n_x in range(self.size[0]):
+            for n_y in range(self.size[1]):
+                wavenumber = ...
+                self.mode_wavelengths[n_x, n_y] = ...
+        
+        self.mode_maps = np.zeros(self.size + self.size)
+        for n_x in range(self.size[0]):
+            for n_y in range(self.size[1]):
+                self.mode_maps[n_x, n_y] = self.mode(n_x, n_y)
+        
+        self.wave_speed = wave_speed
+
+    def mode(self, n_x, n_y):
+        return np.cos(2 * np.pi * n_x * self.x_coords / self.x_max) * np.cos(2 * np.pi * n_y * self.y_coords / self.x_max)
+    
+    @property
+    def fluid_height(self):
+        return self.mode_maps * self.mode_weights
+    
+    def find_weights(self, u):
+        weights = np.zeros(self.size)
+        for n_x in range(self.size[0]):
+            for n_y in range(self.size[1]):
+                weights[n_x, n_y] = np.sum(self.mode_maps[n_x, n_y] * u[n_x, n_y])
+        return weights
+
+    def update(self):
+        pass
+
+
 def gaussian_wave(sim, x, y, std):
     xx = sim.x_coords + x
     yy = sim.y_coords + y
