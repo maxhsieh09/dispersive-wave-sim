@@ -10,10 +10,12 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.std
 window_size = (600, 600)
 t_max = 10
 x_max = 0.5
-dt = 0.0003
+dt = 0.001
 dx = 0.001
 
 base_color = np.array([167, 207, 250]) / 255
+
+env = cv2.imread("env.hdr", cv2.IMREAD_ANYDEPTH)
 
 
 def height_to_normal_map(height_map, spacing=1.0):
@@ -92,7 +94,7 @@ class HeightField2D:
 
     def to_surface(self, min=-1.0, max=1.0, shaded=False):
         if shaded:
-            scaled_height = cv2.resize(self.surface_height, window_size, interpolation=cv2.INTER_CUBIC)
+            scaled_height = cv2.resize(self.surface_height, window_size, interpolation=cv2.INTER_CUBIC) / 10
             normal = height_to_normal_map(scaled_height, self.dx)
 
             light_dir = np.array([-1.0, -1.0, 1.0])
@@ -100,10 +102,12 @@ class HeightField2D:
 
             image = np.einsum('ijk,k->ij', normal, light_dir)
             #view_angle = np.arccos(normal[:, :, 2])
-            #image = fresnel(view_angle, 1.33)
+            #fresnel_factor = fresnel(view_angle, 1.33)
+
+            #view_dir = self.x_coords
 
             image = np.repeat(image[:, :, np.newaxis], 3, axis=2)
-            image *= base_color
+            #image *= base_color
             image = linear_to_gamma(image)
             image = np.clip(image, 0, 1)
             image = (image * 255).astype(np.uint8)
@@ -217,9 +221,10 @@ def gaussian_wave(sim, x, y, std):
     return u0
 
 
-sim = ShallowWater(t_max, x_max, dt, dx)
+#sim = ShallowWater(t_max, x_max, dt, dx)
+sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.1 + 0.1
+sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.05 #+ 0.1
 #sim.bed_height = sim.x_coords / 3
 #sim.fluid_height -= sim.bed_height
 #sim.fluid_height = np.clip(sim.fluid_height, 0, None)
@@ -246,7 +251,7 @@ while running:
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(min=0.1, max=0.4, shaded=False), (0, 0))
+    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=True), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
