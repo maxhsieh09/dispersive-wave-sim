@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.std
 window_size = (600, 600)
 t_max = 10
 x_max = 0.5
-dt = 0.005
+dt = 0.015
 dx = 0.001
 
 base_color = np.array([167, 207, 250]) / 255
@@ -256,7 +256,7 @@ class FFTWave(HeightField2D):
         super().__init__(t_max, x_max, dt, dx)
 
         self.c_function = c_function
-        self.damping = 0.7
+        self.damping = 0.008
 
         self.components = np.zeros(self.size, dtype=complex)
         self.fftfreq = np.fft.fftfreq(self.size[0], self.dx)
@@ -271,12 +271,19 @@ class FFTWave(HeightField2D):
     def fluid_height(self, value):
         self.components = np.fft.fft2(value)
 
+    def add_wave(self, wave):
+        self.components += np.fft.fft2(wave)
+
     def update(self):
         k = 2 * np.pi * self.fftfreq
         k[k == 0] = 0.1
         phase_shift = -k * self.c_function(2 * np.pi / np.abs(k)) * self.dt
 
         self.components *= np.exp(phase_shift * 1j)
+
+        # damping
+        wavelength_factor = 1 / 2 / np.pi * np.abs(k)
+        self.components *= np.clip(1 - self.damping * wavelength_factor * dt, 0.1, 1)
 
         super().update()
 
@@ -300,7 +307,7 @@ def gaussian_wave(sim, x, y, std):
 #sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
 sim = FFTWave(t_max, x_max, dt, dx, wave_speed)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.05 #+ 0.1
+sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.2 #+ 0.1
 #sim.bed_height = sim.x_coords / 3
 #sim.fluid_height -= sim.bed_height
 #sim.fluid_height = np.clip(sim.fluid_height, 0, None)
@@ -315,15 +322,18 @@ while running:
             running = False
         
         if event.type == pygame.MOUSEBUTTONDOWN:
-            x = (0.5 - event.pos[0] / window_size[0]) * x_max
-            y = (0.5 - event.pos[1] / window_size[1]) * x_max
-            sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
+            if pygame.mouse.get_pressed()[0]:
+                x = (0.5 - event.pos[0] / window_size[0]) * x_max
+                y = (0.5 - event.pos[1] / window_size[1]) * x_max
+                #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
+                sim.add_wave(gaussian_wave(sim, y, x, 0.004) * 0.1)
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
-                sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
+                #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
+                sim.add_wave(gaussian_wave(sim, y, x, 0.004) * 0.02)
 
     screen.fill((0, 0, 0))
     sim.update()
