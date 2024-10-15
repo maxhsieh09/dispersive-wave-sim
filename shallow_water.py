@@ -4,13 +4,14 @@ import cv2
 import pygame
 import logging
 import sys
+import typing
 
 logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.stdout)])
 
 window_size = (600, 600)
 t_max = 10
 x_max = 0.5
-dt = 0.001
+dt = 0.005
 dx = 0.001
 
 base_color = np.array([167, 207, 250]) / 255
@@ -250,6 +251,43 @@ class NormalModes(HeightField2D):
         pass
 
 
+class FFTWave(HeightField2D):
+    def __init__(self, t_max, x_max, dt, dx, c_function: typing.Callable):
+        super().__init__(t_max, x_max, dt, dx)
+
+        self.c_function = c_function
+        self.damping = 0.7
+
+        self.components = np.zeros(self.size, dtype=complex)
+        self.fftfreq = np.fft.fftfreq(self.size[0], self.dx)
+        self.fftfreq = np.meshgrid(self.fftfreq, self.fftfreq)
+        self.fftfreq = np.sqrt(self.fftfreq[0] ** 2 + self.fftfreq[1] ** 2)
+
+    @property
+    def fluid_height(self):
+        return np.real(np.fft.ifft2(self.components))
+    
+    @fluid_height.setter
+    def fluid_height(self, value):
+        self.components = np.fft.fft2(value)
+
+    def update(self):
+        k = 2 * np.pi * self.fftfreq
+        k[k == 0] = 0.1
+        phase_shift = -k * self.c_function(2 * np.pi / np.abs(k)) * self.dt
+
+        self.components *= np.exp(phase_shift * 1j)
+
+        super().update()
+
+
+def wave_speed(wavelength):
+    speed = np.sqrt((9.8 * wavelength / 2 / np.pi + 2 * np.pi * 0.0728 / 1000 / wavelength) * np.tanh(2 * np.pi * 10 / wavelength)) * 1
+    speed = np.nan_to_num(speed)
+        
+    return speed
+
+
 def gaussian_wave(sim, x, y, std):
     xx = sim.x_coords + x
     yy = sim.y_coords + y
@@ -259,7 +297,8 @@ def gaussian_wave(sim, x, y, std):
 
 
 #sim = ShallowWater(t_max, x_max, dt, dx)
-sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
+#sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
+sim = FFTWave(t_max, x_max, dt, dx, wave_speed)
 
 sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.05 #+ 0.1
 #sim.bed_height = sim.x_coords / 3
