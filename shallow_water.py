@@ -10,9 +10,9 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.std
 
 window_size = (600, 600)
 t_max = 10
-x_max = 0.5
+x_max = 1
 dt = 0.015
-dx = 0.001
+dx = 0.003
 
 base_color = np.array([167, 207, 250]) / 255
 
@@ -268,23 +268,39 @@ class FFTWave(HeightField2D):
         super().__init__(t_max, x_max, dt, dx)
 
         self.c_function = c_function
-        self.damping = 0.008
+        self.damping = 0.1
 
-        self.components = np.zeros(self.size, dtype=complex)
-        self.fftfreq = np.fft.fftfreq(self.size[0], self.dx)
+        # double the size of the grid, for reflection
+        self.full_size = self.size[0] * 2, self.size[1] * 2
+
+        self.components = np.zeros(self.full_size, dtype=complex)
+        self.fftfreq = np.fft.fftfreq(self.full_size[0], self.dx)
         self.fftfreq = np.meshgrid(self.fftfreq, self.fftfreq)
         self.fftfreq = np.sqrt(self.fftfreq[0] ** 2 + self.fftfreq[1] ** 2)
 
+    def extend(self, wave):
+        reflection_domain = np.zeros((self.size[0] * 2, self.size[1] * 2), dtype=complex)
+        reflection_domain[:self.size[0], :self.size[1]] = wave
+        return reflection_domain
+    
+    def fold_reflections(self, wave):
+        # fold the first axis
+        folded = wave[:self.size[0], :] + wave[-1:self.size[0]-1:-1, :]
+        # fold the second axis
+        folded = folded[:, :self.size[1]] + folded[:, -1:self.size[1]-1:-1]
+
+        return folded
+
     @property
     def fluid_height(self):
-        return np.real(np.fft.ifft2(self.components))
+        return self.fold_reflections(np.real(np.fft.ifft2(self.components)))
     
     @fluid_height.setter
     def fluid_height(self, value):
-        self.components = np.fft.fft2(value)
+        self.components = np.fft.fft2(self.extend(value))
 
     def add_wave(self, wave):
-        self.components += np.fft.fft2(wave)
+        self.components += np.fft.fft2(self.extend(wave))
 
     def update(self):
         k = 2 * np.pi * self.fftfreq
@@ -315,7 +331,9 @@ def gaussian_wave(sim, x, y, std):
     return u0
 
 
-wave_std = 0.005
+std1 = 0.005
+std2 = 0.03
+wave_std = std1
 
 #sim = ShallowWater(t_max, x_max, dt, dx)
 #sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
@@ -337,10 +355,12 @@ while running:
         
         if event.type == pygame.MOUSEBUTTONDOWN:
             if pygame.mouse.get_pressed()[0]:
+                wave_std = np.random.uniform(std1, std2)
+
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
-                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.1)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 20 * wave_std)
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
@@ -351,7 +371,7 @@ while running:
 
     screen.fill((0, 0, 0))
     sim.update()
-    screen.blit(sim.to_surface(min=-0.1, max=0.1, shaded=True), (0, 0))
+    screen.blit(sim.to_surface(min=-1, max=1, shaded=True), (0, 0))
     pygame.display.flip()
 
 pygame.quit()
