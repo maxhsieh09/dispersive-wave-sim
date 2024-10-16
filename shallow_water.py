@@ -46,6 +46,10 @@ def height_to_normal_map(height_map, spacing=1.0):
     return normal_map
 
 
+def sample_texture(tex, u, v):
+    pass
+
+
 def fresnel(angle, n2):
     r0 = ((1 - n2) / (1 + n2)) ** 2
     return r0 + (1 - r0) * (1 - np.cos(angle)) ** 5
@@ -105,7 +109,15 @@ class HeightField2D:
             #view_angle = np.arccos(normal[:, :, 2])
             #fresnel_factor = fresnel(view_angle, 1.33)
 
-            #view_dir = self.x_coords
+            #view_dir = np.array([0, 0, -1])
+            #reflected_dir = view_dir - 2 * np.einsum('ijk,k->ij', normal, view_dir) * normal
+
+            # calculate spherical coords of reflected light
+            #theta = np.arccos(reflected_dir[:, :, 2])
+            #phi = np.arctan2(reflected_dir[:, :, 1], reflected_dir[:, :, 0])
+            #u = phi / (2 * np.pi)
+            #v = (theta / np.pi) * 0.5 + 0.5
+
 
             image = np.repeat(image[:, :, np.newaxis], 3, axis=2)
             #image *= base_color
@@ -303,11 +315,13 @@ def gaussian_wave(sim, x, y, std):
     return u0
 
 
+wave_std = 0.005
+
 #sim = ShallowWater(t_max, x_max, dt, dx)
 #sim = WaveEquation(t_max, x_max, dt, dx, 0.5)
 sim = FFTWave(t_max, x_max, dt, dx, wave_speed)
 
-sim.fluid_height = gaussian_wave(sim, 0, 0, 0.01) * 0.2 #+ 0.1
+sim.fluid_height = gaussian_wave(sim, 0, 0, wave_std) * 0.2 #+ 0.1
 #sim.bed_height = sim.x_coords / 3
 #sim.fluid_height -= sim.bed_height
 #sim.fluid_height = np.clip(sim.fluid_height, 0, None)
@@ -326,14 +340,14 @@ while running:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
-                sim.add_wave(gaussian_wave(sim, y, x, 0.004) * 0.1)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.1)
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
-                sim.add_wave(gaussian_wave(sim, y, x, 0.004) * 0.02)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.02)
 
     screen.fill((0, 0, 0))
     sim.update()
