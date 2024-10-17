@@ -12,7 +12,7 @@ window_size = (600, 600)
 t_max = 10
 x_max = 1
 dt = 0.015
-dx = 0.003
+dx = 0.005
 
 base_color = np.array([167, 207, 250]) / 255
 
@@ -268,7 +268,7 @@ class FFTWave(HeightField2D):
         super().__init__(t_max, x_max, dt, dx)
 
         self.c_function = c_function
-        self.damping = 0.1
+        self.damping = 0.01
 
         # double the size of the grid, for reflection
         self.full_size = self.size[0] * 2, self.size[1] * 2
@@ -328,6 +328,7 @@ def gaussian_wave(sim, x, y, std):
     yy = sim.y_coords + y
 
     u0 = np.exp(-(0.5 / std ** 2) * ((xx - x_max / 2) ** 2 + (yy - x_max / 2) ** 2))
+    u0 -= np.exp(-(0.25 / std ** 2) * ((xx - x_max / 2) ** 2 + (yy - x_max / 2) ** 2)) * 2
     return u0
 
 
@@ -360,14 +361,18 @@ while running:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
-                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 20 * wave_std)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 10 * wave_std)
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
-                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.02)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 10 * wave_std)
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r:
+                sim.fluid_height = np.zeros(sim.size)
 
     screen.fill((0, 0, 0))
     sim.update()
