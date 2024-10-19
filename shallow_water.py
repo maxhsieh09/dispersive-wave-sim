@@ -11,10 +11,10 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(sys.std
 window_size = (600, 600)
 t_max = 10
 x_max = 1
-dt = 0.015
+dt = 0.03
 dx = 0.005
 
-base_color = np.array([167, 207, 250]) / 255
+base_color = np.array([167, 207, 250]) / 500
 
 env = cv2.imread("env.hdr", cv2.IMREAD_ANYDEPTH)
 
@@ -102,15 +102,19 @@ class HeightField2D:
             scaled_height = cv2.resize(self.surface_height, window_size, interpolation=cv2.INTER_CUBIC) / 10
             normal = height_to_normal_map(scaled_height, self.dx)
 
-            light_dir = np.array([-1.0, -1.0, 1.0])
+            light_dir = np.array([-0.2, -0.5, 1.0])
             light_dir = light_dir / np.linalg.norm(light_dir)
 
-            image = np.einsum('ijk,k->ij', normal, light_dir)
-            #view_angle = np.arccos(normal[:, :, 2])
-            #fresnel_factor = fresnel(view_angle, 1.33)
+            #image = np.einsum('ijk,k->ij', normal, light_dir)
+            view_angle = np.arccos(normal[:, :, 2])
+            fresnel_factor = fresnel(view_angle, 1.33)
 
-            #view_dir = np.array([0, 0, -1])
-            #reflected_dir = view_dir - 2 * np.einsum('ijk,k->ij', normal, view_dir) * normal
+            view_dir = np.array([0, 0, -1])
+            reflected_dir = view_dir - 2 * np.einsum('ij,ijk->ijk', np.einsum('ijk,k->ij', normal, view_dir), normal)
+            dot = np.einsum('ijk,k->ij', reflected_dir, light_dir)
+
+            image = np.where(dot > 0.8, 5., 0)
+            image *= fresnel_factor
 
             # calculate spherical coords of reflected light
             #theta = np.arccos(reflected_dir[:, :, 2])
@@ -120,6 +124,7 @@ class HeightField2D:
 
 
             image = np.repeat(image[:, :, np.newaxis], 3, axis=2)
+            #image += np.einsum('ij,k->ijk', (1 - fresnel_factor), base_color)
             #image *= base_color
             image = linear_to_gamma(image)
             image = np.clip(image, 0, 1)
