@@ -158,13 +158,14 @@ def update_animate(data):
         sim.add_wave(u0)
     
     sim.update() # 更新波形
-    ax.collections.clear()
+    ax.clear()
     sim.line = ax.fill_between(
         sim.x[sim.border_width:-sim.border_width-1],
         sim.u[sim.border_width:-sim.border_width-1],
         -1,
         color="skyblue"
     )
+    ax.set_ylim([-1, 1])
     ax.set_title(f"t = {sim.t:.2f}, {sim.frame_count} steps")
 
     return sim.line,
@@ -173,6 +174,6 @@ def update_animate(data):
 ani = animation.FuncAnimation(fig, update_animate, 
                               init_func=init_animate, interval=1) 
 
-plt.ylim([-1, 1])
+#plt.ylim([-1, 1])
 
 plt.show()

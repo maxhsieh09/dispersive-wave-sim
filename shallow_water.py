@@ -23,7 +23,8 @@ def height_to_normal_map(height_map, spacing=1.0):
     """
     Convert a height map into a normal map.
 
-    Parameters:
+    Parameters
+    ----------
     - height_map: 2D numpy array of height values.
     - spacing: Real-world distance between each point in the height map.
     
@@ -102,10 +103,11 @@ class HeightField2D:
             scaled_height = cv2.resize(self.surface_height, window_size, interpolation=cv2.INTER_CUBIC) / 10
             normal = height_to_normal_map(scaled_height, self.dx)
 
-            light_dir = np.array([-0.2, -0.5, 1.0])
+            light_dir = np.array([-2.0, -1.0, 1.0])
             light_dir = light_dir / np.linalg.norm(light_dir)
 
-            #image = np.einsum('ijk,k->ij', normal, light_dir)
+            image = np.einsum('ijk,k->ij', normal, light_dir)
+            '''
             view_angle = np.arccos(normal[:, :, 2])
             fresnel_factor = fresnel(view_angle, 1.33)
 
@@ -115,6 +117,7 @@ class HeightField2D:
 
             image = np.where(dot > 0.8, 5., 0)
             image *= fresnel_factor
+            '''
 
             # calculate spherical coords of reflected light
             #theta = np.arccos(reflected_dir[:, :, 2])
@@ -315,7 +318,8 @@ class FFTWave(HeightField2D):
         self.components *= np.exp(phase_shift * 1j)
 
         # damping
-        wavelength_factor = 1 / 2 / np.pi * np.abs(k)
+        freq = self.fftfreq * self.c_function(2 * np.pi / np.abs(k))
+        wavelength_factor = freq ** 2
         self.components *= np.clip(1 - self.damping * wavelength_factor * dt, 0.1, 1)
 
         super().update()
@@ -337,8 +341,8 @@ def gaussian_wave(sim, x, y, std):
     return u0
 
 
-std1 = 0.005
-std2 = 0.03
+std1 = 0.002
+std2 = 0.01
 wave_std = std1
 
 #sim = ShallowWater(t_max, x_max, dt, dx)
@@ -366,14 +370,14 @@ while running:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.05
-                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 10 * wave_std)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.5)
         
         if event.type == pygame.MOUSEMOTION:
             if pygame.mouse.get_pressed()[0]:
                 x = (0.5 - event.pos[0] / window_size[0]) * x_max
                 y = (0.5 - event.pos[1] / window_size[1]) * x_max
                 #sim.fluid_height += gaussian_wave(sim, y, x, 0.01) * 0.01
-                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 10 * wave_std)
+                sim.add_wave(gaussian_wave(sim, y, x, wave_std) * 0.5)
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
