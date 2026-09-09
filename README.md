@@ -24,15 +24,16 @@ Pygame window; click or drag to add waves, and press `R` to reset it.
 
 ## FFT phase propagation
 
-`move_phase_[1d/2d].py` are the recommended, fast simulations. Each frame,
-they use an FFT to decompose the surface into frequency components, advance each
-component's phase according to its wavelength-dependent wave speed, and transform
-back to the spatial domain. This directly produces dispersion without numerically
-integrating the wave equation.
+`move_phase_[1d/2d].py` are the recommended, fast simulations. They represent
+the surface as frequency components and advance each component's phase according
+to its wavelength-dependent wave speed, directly producing dispersion without
+numerically integrating the wave equation..
 
 The 2D version uses a reflection trick built on FFT periodicity: it doubles the
 simulation domain, then folds the right and bottom halves back over the visible
 domain. The folded copies act as reflected waves at the boundaries.
+
+<img src="docs/wave_fold_diagram.png" alt="Reflection folding diagram" width=600/>
 
 ## Older wave-equation experiments
 
