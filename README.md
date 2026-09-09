@@ -1,7 +1,9 @@
 # Interactive Simulations of Dispersive Water Waves
 
-<img src="docs/wave_2d_demo.gif" alt="2D simulation video" height=300/>
-<img src="docs/wave_1d_demo.gif" alt="1D simulation video" height=300/>
+<div style="display: flex; gap: 10px">
+    <img src="docs/wave_2d_demo.gif" alt="2D simulation video" height=300/>
+    <img src="docs/wave_1d_demo.gif" alt="1D simulation video" height=300/>
+</div>
 
 Small interactive experiments for dispersive water waves in one and two dimensions.
 
