@@ -9,8 +9,7 @@ Small interactive experiments for dispersive water waves in one and two dimensio
 
 ## Run
 
-Install the dependencies, then run a simulation from `src/` (the 2D program loads
-`env.hdr` from that directory):
+Install the dependencies, then run a simulation from `src/`:
 
 ```bash
 python -m pip install -r requirements.txt
